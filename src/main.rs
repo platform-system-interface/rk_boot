@@ -33,7 +33,7 @@ pub fn connect() -> (Interface, u8, u8) {
         .unwrap()
         .find(|d| d.vendor_id() == USB_VID_RK && d.product_id() == USB_PID_RK3366)
         .expect("Device not found, is it connected and in the right mode?");
-    info!("{di:?}");
+    debug!("{di:?}");
     let ms = di.manufacturer_string().unwrap_or("[no manufacturer]");
     let ps = di.product_string().unwrap_or("[no product id]");
     info!("Found {ms} {ps}");
