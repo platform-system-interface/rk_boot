@@ -238,8 +238,11 @@ pub fn run(i: &Interface, data: &[u8], region: &Region) {
         let remaining = &ext_data[o..];
         let l = remaining.len();
         info!("Send remaining data, {l} bytes");
-        debug!("  first bytes: {:02x?}", &remaining[..4]);
-        debug!("  last bytes:  {:02x?}", &remaining[l - 4..l]);
+        let f = l.min(4);
+        debug!("  first bytes: {:02x?}", &remaining[..f]);
+        if l > 4 {
+            debug!("  last bytes:  {:02x?}", &remaining[l - 4..l]);
+        }
         usb_out(i, remaining, region);
     } else {
         info!("Send extra zero-byte for 4K-aligned blob");
