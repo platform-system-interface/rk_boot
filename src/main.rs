@@ -1,8 +1,8 @@
-use std::thread;
+use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use clap::{Parser, Subcommand, ValueEnum};
-use log::{debug, error, info};
+use clap::{Parser, Subcommand};
+use log::{debug, info};
 use nusb::{Device, Interface, Speed, transfer::Direction};
 
 mod protocol;
@@ -21,7 +21,7 @@ fn claim_interface(d: &Device, ii: u8) -> std::result::Result<Interface, String>
                 return Ok(i);
             }
             Err(_) => {
-                thread::sleep(CLAIM_INTERFACE_PERIOD);
+                sleep(CLAIM_INTERFACE_PERIOD);
             }
         }
     }
@@ -74,6 +74,15 @@ pub fn connect() -> (Interface, u8, u8) {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Run binary code from file
+    #[clap(verbatim_doc_comment)]
+    Run {
+        #[clap(long, short, value_enum, default_value = "sram")]
+        region: protocol::Region,
+        file_name: String,
+    },
+    /// Get chip information; requires DRAM init + usbplug binary, see
+    /// https://github.com/rockchip-linux/rkbin
     Info,
 }
 
@@ -97,5 +106,9 @@ fn main() {
 
     match cmd {
         Command::Info => protocol::info(&i, e_in_addr, e_out_addr),
+        Command::Run { file_name, region } => {
+            let data = std::fs::read(file_name).unwrap();
+            protocol::run(&i, &data, &region);
+        }
     }
 }

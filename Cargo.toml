@@ -14,3 +14,4 @@ futures-lite = { version = "2", default-features = false }
 nusb = "=0.1.12"
 zerocopy-derive = "0.8.24"
 zerocopy = "0.8.24"
+crc = "3.2.1"
