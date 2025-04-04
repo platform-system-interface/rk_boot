@@ -95,6 +95,24 @@ struct Cli {
     cmd: Command,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Mode {
+    UsbPlug = 1,
+    MaskROM = 2,
+    Unknown = 3,
+}
+
+impl std::fmt::Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let m = match self {
+            Self::UsbPlug => "USB plug",
+            Self::MaskROM => "mask ROM",
+            Self::Unknown => "unknown",
+        };
+        write!(f, "{m}")
+    }
+}
+
 fn main() {
     // Default to log level "info". Otherwise, you get no "regular" logs.
     let env = env_logger::Env::default().default_filter_or("info");
@@ -104,8 +122,21 @@ fn main() {
 
     let (i, e_in_addr, e_out_addr) = connect();
 
+    // Good enough as a heuristic; USB plug mode also has no manufacturer string
+    let mode = match e_out_addr {
+        1 => Mode::UsbPlug,
+        2 => Mode::MaskROM,
+        _ => Mode::Unknown,
+    };
+    info!("Mode: {mode}");
+
     match cmd {
-        Command::Info => protocol::info(&i, e_in_addr, e_out_addr),
+        Command::Info => {
+            if mode != Mode::UsbPlug {
+                panic!("Device must be in USB plug mode");
+            }
+            protocol::info(&i, e_in_addr, e_out_addr);
+        }
         Command::Run { file_name, region } => {
             let data = std::fs::read(file_name).unwrap();
             protocol::run(&i, &data, &region);
