@@ -5,7 +5,7 @@ use clap::ValueEnum;
 
 use async_io::{Timer, block_on};
 use futures_lite::FutureExt;
-use log::{debug, info};
+use log::{debug, info, warn};
 use nusb::Interface;
 use nusb::transfer::{ControlOut, ControlType, Recipient, RequestBuffer};
 use zerocopy::{FromBytes, IntoBytes};
@@ -35,6 +35,7 @@ const USB_RESPONSE_SIGNATURE: &[u8; 4] = b"USBS";
 
 const FLAG_DIR_IN: u8 = 0x80;
 
+// NOTE: more commands are known; to be added later
 #[derive(Clone, Debug, Copy, IntoBytes, Immutable)]
 #[repr(u8)]
 enum Command {
@@ -181,7 +182,7 @@ const CHUNK_SIZE: usize = 4096;
 // TODO: Are there other requests than this?
 const REQUEST: u8 = 0xc;
 
-fn usb_out(i: &Interface, data: &[u8], region: &Region) {
+fn usb_out(i: &Interface, data: &[u8], region: &Region, tolerate_timeout: bool) {
     let index = region.clone() as u16; // where the mask ROM writes this;
     let out = ControlOut {
         control_type: ControlType::Vendor,
@@ -206,8 +207,13 @@ fn usb_out(i: &Interface, data: &[u8], region: &Region) {
         }))
     };
 
+    // NOTE: The last chunk often seems to time out.
     if let Err(e) = res {
-        panic!("{e:?}");
+        if tolerate_timeout {
+            warn!("{e:?} (tolerated)");
+        } else {
+            panic!("{e:?}");
+        }
     }
 }
 
@@ -231,7 +237,7 @@ pub fn run(i: &Interface, data: &[u8], region: &Region) {
         let chunk = &ext_data[o..o + CHUNK_SIZE];
         debug!("  first bytes: {:02x?}", &chunk[..4]);
         debug!("  last bytes:  {:02x?}", &chunk[CHUNK_SIZE - 4..CHUNK_SIZE]);
-        usb_out(i, chunk, region);
+        usb_out(i, chunk, region, false);
     }
     if ext_data.len() % CHUNK_SIZE > 0 {
         let o = full_chunks * CHUNK_SIZE;
@@ -243,9 +249,9 @@ pub fn run(i: &Interface, data: &[u8], region: &Region) {
         if l > 4 {
             debug!("  last bytes:  {:02x?}", &remaining[l - 4..l]);
         }
-        usb_out(i, remaining, region);
+        usb_out(i, remaining, region, true);
     } else {
         info!("Send extra zero-byte for 4K-aligned blob");
-        usb_out(i, &[0], region);
+        usb_out(i, &[0], region, true);
     }
 }
